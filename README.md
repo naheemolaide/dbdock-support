@@ -30,17 +30,30 @@ npx dbdock restore   # Restore backup
 
 ## Installation
 
+**Global Installation (Recommended):**
+
 ```bash
-npm install -g dbdock
-# or use directly with npx
+npm install -g dbdock-cli
+
+dbdock init      # Use directly
+dbdock backup
+dbdock status
+```
+
+**Or use with npx (No installation needed):**
+
+```bash
 npx dbdock init
+npx dbdock backup
+npx dbdock status
 ```
 
 ## CLI Commands
 
-### `npx dbdock init`
+### `dbdock init`
 
 Interactive setup wizard that creates `dbdock.config.json` with:
+
 - Database connection (host, port, credentials)
 - Storage provider (Local, S3, R2, Cloudinary)
 - Encryption/compression settings
@@ -58,6 +71,7 @@ Creates database backup with real-time progress tracking:
 ```
 
 **Options:**
+
 ```bash
 npx dbdock backup --encrypt --compress --compression-level 9
 ```
@@ -68,11 +82,13 @@ npx dbdock backup --encrypt --compress --compression-level 9
 - `--compression-level <1-11>` - Compression level (default: 6)
 
 **Generate encryption key:**
+
 ```bash
 node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 ```
 
 **Backup Formats:**
+
 - `custom` (default) - PostgreSQL custom binary format (.sql)
 - `plain` - Plain SQL text format (.sql)
 - `directory` - Directory format (.dir)
@@ -94,6 +110,7 @@ Progress:
 ```
 
 **Smart filtering** (auto-enabled for 20+ backups):
+
 - Show recent (last 10)
 - Date range (24h, 7d, 30d, 90d, custom)
 - Search by keyword/ID
@@ -135,25 +152,57 @@ npx dbdock cleanup --force      # Skip confirmation
 
 Shows detailed preview of what will be deleted and space to reclaim.
 
-### `npx dbdock test`
+### `dbdock status`
+
+Quick view of all schedules and service status:
+
+```bash
+dbdock status
+```
+
+**Output:**
+
+```
+📅 Scheduled Backups:
+
+┌─────┬──────────────┬─────────────────┬──────────┐
+│  #  │ Name         │ Cron Expression │ Status   │
+├─────┼──────────────┼─────────────────┼──────────┤
+│   1 │ daily        │ 0 * * * *       │ ✓ Active │
+│   2 │ weekly       │ 0 0 * * 0       │ ✗ Paused │
+└─────┴──────────────┴─────────────────┴──────────┘
+
+Total: 2 schedule(s) - 1 active, 1 paused
+
+🚀 Service Status:
+
+🟢 Running (PM2)
+  PID: 12345
+  Uptime: 2d 5h
+  Memory: 45.23 MB
+```
+
+### `dbdock test`
 
 Validates database, storage, and email configuration.
 
-### `npx dbdock schedule`
+### `dbdock schedule`
 
-Interactive schedule management for automated backups:
+Manage backup schedules in configuration:
 
 ```bash
-npx dbdock schedule
+dbdock schedule
 ```
 
 **Features:**
-- View current schedules
-- Add new schedule with cron expression
-- Remove existing schedules
-- Built-in presets (hourly, daily, weekly, monthly)
+
+- View current schedules with status
+- Add new schedule with cron expression presets
+- Remove or toggle (enable/disable) schedules
+- Saves to `dbdock.config.json`
 
 **Schedule Presets:**
+
 - Every hour: `0 * * * *`
 - Every day at midnight: `0 0 * * *`
 - Every day at 2 AM: `0 2 * * *`
@@ -161,32 +210,7 @@ npx dbdock schedule
 - Every month (1st): `0 0 1 * *`
 - Custom cron expression
 
-**Important Notes:**
-- Schedules are saved to `dbdock.config.json`
-- Requires DBDock NestJS service running to execute scheduled backups
-- CLI schedules are for configuration only - use programmatic mode for execution
-- Scheduled backups will send email alerts if configured
-- Manual `npx dbdock backup` does NOT use schedules
-
-**Example Schedule Configuration:**
-```json
-{
-  "backup": {
-    "schedules": [
-      {
-        "name": "Daily Backup",
-        "cron": "0 2 * * *",
-        "enabled": true
-      },
-      {
-        "name": "Weekly Full Backup",
-        "cron": "0 0 * * 0",
-        "enabled": true
-      }
-    ]
-  }
-}
-```
+**⚠️ Important:** Schedules only execute when DBDock is integrated into your NestJS application (see Programmatic Usage below). The CLI is for configuration only.
 
 ## Configuration
 
@@ -251,11 +275,13 @@ After running `npx dbdock init`, a `dbdock.config.json` file is created:
 ### Storage Providers
 
 **Local:**
+
 ```json
 { "storage": { "provider": "local", "local": { "path": "./backups" } } }
 ```
 
 **AWS S3:**
+
 ```json
 {
   "storage": {
@@ -273,6 +299,7 @@ After running `npx dbdock init`, a `dbdock.config.json` file is created:
 Required permissions: `s3:PutObject`, `s3:GetObject`, `s3:ListBucket`, `s3:DeleteObject`
 
 **Cloudflare R2:**
+
 ```json
 {
   "storage": {
@@ -289,6 +316,7 @@ Required permissions: `s3:PutObject`, `s3:GetObject`, `s3:ListBucket`, `s3:Delet
 ```
 
 **Cloudinary:**
+
 ```json
 {
   "storage": {
@@ -323,6 +351,7 @@ Automatic cleanup to prevent storage bloat from frequent backups:
 ```
 
 **How it works:**
+
 - Keeps most recent `minBackups` (safety net, never deleted)
 - Deletes backups exceeding `maxBackups` limit (oldest first)
 - Deletes backups older than `maxAgeDays` (respecting minBackups)
@@ -330,12 +359,15 @@ Automatic cleanup to prevent storage bloat from frequent backups:
 - Manual cleanup: `npx dbdock cleanup`
 
 **Safety features:**
+
 - Always preserves `minBackups` most recent backups
 - Shows preview before deletion
 - Detailed logging of what was deleted
 - Error handling for failed deletions
 
-## Programmatic Usage (NestJS)
+## Programmatic Usage
+
+### NestJS Integration
 
 ```typescript
 import { Module } from '@nestjs/common';
@@ -344,18 +376,38 @@ import { DBDockModule } from 'dbdock';
 @Module({
   imports: [
     DBDockModule.forRoot({
-      database: { /* connection config */ },
-      storage: { provider: 's3', s3: { /* S3 config */ } },
+      database: {
+        type: 'postgres',
+        host: 'localhost',
+        port: 5432,
+        username: 'postgres',
+        password: process.env.DB_PASSWORD,
+        database: 'myapp',
+      },
+      storage: {
+        provider: 's3',
+        s3: {
+          bucket: 'my-backups',
+          region: 'us-east-1',
+          accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+          secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+        },
+      },
       backup: {
         compression: { enabled: true, level: 6 },
         encryption: { enabled: true, key: process.env.ENCRYPTION_KEY },
-        schedules: [{ name: 'Daily', cron: '0 2 * * *', enabled: true }]
+        schedules: [
+          { name: 'Daily Backup', cron: '0 2 * * *', enabled: true },
+          { name: 'Weekly Full', cron: '0 0 * * 0', enabled: true },
+        ],
       },
     }),
   ],
 })
 export class AppModule {}
 ```
+
+### Creating and Restoring Backups
 
 ```typescript
 import { BackupService } from 'dbdock';
@@ -365,13 +417,76 @@ export class MyService {
   constructor(private backupService: BackupService) {}
 
   async createBackup() {
-    const result = await this.backupService.createBackup();
+    const result = await this.backupService.createBackup({
+      compress: true,
+      encrypt: true,
+    });
+
+    console.log(`Backup created: ${result.metadata.id}`);
+    return result;
   }
 
   async restore(backupId: string) {
     await this.backupService.restoreBackup(backupId);
   }
 }
+```
+
+### Schedule Management API
+
+```typescript
+import { ScheduleManager } from 'dbdock';
+
+const scheduleManager = new ScheduleManager();
+
+scheduleManager.addSchedule({
+  name: 'Hourly Backup',
+  cron: '0 * * * *',
+  enabled: true,
+});
+
+const schedules = scheduleManager.getSchedules();
+console.log('All schedules:', schedules);
+
+scheduleManager.updateSchedule('Hourly Backup', {
+  cron: '0 */2 * * *',
+});
+
+scheduleManager.enableSchedule('Daily Backup');
+scheduleManager.disableSchedule('Weekly Full');
+
+scheduleManager.removeSchedule('Old Schedule');
+```
+
+### Complete Example with Schedules
+
+```typescript
+import { NestFactory } from '@nestjs/core';
+import { AppModule } from './app.module';
+import { ScheduleManager } from 'dbdock';
+
+async function bootstrap() {
+  const scheduleManager = new ScheduleManager();
+
+  scheduleManager.addSchedule({
+    name: 'Daily Backup',
+    cron: '0 2 * * *',
+    enabled: true,
+  });
+
+  scheduleManager.addSchedule({
+    name: 'Weekly Archive',
+    cron: '0 0 * * 0',
+    enabled: true,
+  });
+
+  const app = await NestFactory.create(AppModule);
+  await app.listen(3000);
+
+  console.log('Application started with scheduled backups');
+}
+
+bootstrap();
 ```
 
 ## Requirements
@@ -381,6 +496,7 @@ export class MyService {
 - PostgreSQL client tools (`pg_dump`, `pg_restore`, `psql`)
 
 **Installing PostgreSQL client tools:**
+
 ```bash
 # macOS
 brew install postgresql
@@ -399,6 +515,7 @@ Run `npx dbdock test` to verify your configuration.
 ### Common Issues
 
 **pg_dump not found:**
+
 ```bash
 # macOS
 brew install postgresql
@@ -408,6 +525,7 @@ sudo apt-get install postgresql-client
 ```
 
 **Database connection errors:**
+
 - Verify `host`, `port`, `username`, `password`, `database` in config
 - Test connection: `psql -h HOST -p PORT -U USERNAME -d DATABASE`
 - Check PostgreSQL server is running
@@ -415,23 +533,27 @@ sudo apt-get install postgresql-client
 
 **Storage errors:**
 
-*AWS S3:*
+_AWS S3:_
+
 - Verify credentials are correct
 - Ensure IAM user has permissions: `s3:PutObject`, `s3:GetObject`, `s3:ListBucket`, `s3:DeleteObject`
 - Check bucket name and region
 
-*Cloudflare R2:*
+_Cloudflare R2:_
+
 - Verify API token is correct
 - Check endpoint URL format: `https://ACCOUNT_ID.r2.cloudflarestorage.com`
 - Ensure bucket exists and is accessible
 - Verify R2 credentials have read/write permissions
 
-*Cloudinary:*
+_Cloudinary:_
+
 - Verify cloud name, API key, and secret are correct
 - Check your Cloudinary account is active
 - Ensure API credentials have media library access
 
 **Encryption key errors:**
+
 ```bash
 # Generate a valid 64-character hex key
 node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
@@ -440,11 +562,13 @@ node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 ```
 
 **R2 restore not working:**
+
 - Ensure backups are in `dbdock_backups/` folder
 - Verify backup files are named with `.sql` extension
 - Check endpoint configuration matches R2 account ID
 
 **No backups found:**
+
 - Local: Check files exist in configured path
 - S3/R2: Verify files are in `dbdock_backups/` folder
 - Cloudinary: Check Media Library for `dbdock_backups` folder
