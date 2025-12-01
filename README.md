@@ -24,7 +24,7 @@ npx dbdock restore   # Restore backup
 - **Security** - AES-256 encryption, Brotli compression
 - **Retention Policies** - Automatic cleanup by count/age with safety nets
 - **Smart UX** - Intelligent filtering for 100+ backups, clear error messages
-- **Email Alerts** - SMTP notifications with custom templates
+- **Alerts** - Email (SMTP) and Slack notifications for backups (CLI & Programmatic)
 - **TypeScript Native** - Full type safety for programmatic usage
 - **Automation** - Cron schedules, auto-cleanup after backups
 
@@ -57,7 +57,7 @@ Interactive setup wizard that creates `dbdock.config.json` with:
 - Database connection (host, port, credentials)
 - Storage provider (Local, S3, R2, Cloudinary)
 - Encryption/compression settings
-- Email alerts (optional)
+- Email and Slack alerts (optional)
 
 Auto-adds config to `.gitignore` to protect credentials.
 
@@ -114,6 +114,15 @@ Progress:
 - Show recent (last 10)
 - Date range (24h, 7d, 30d, 90d, custom)
 - Search by keyword/ID
+
+**Migration Support:**
+
+You can choose to restore to a **New Database Instance** during the restore process. This is perfect for migrating data between servers (e.g., from staging to production or local to cloud).
+
+1. Run `npx dbdock restore`
+2. Select a backup
+3. Choose "New Database Instance (Migrate)"
+4. Enter connection details for the target database
 
 Shows database stats and requires confirmation before restore.
 
@@ -534,12 +543,12 @@ startScheduler().catch(console.error);
 
 **Note:** The CLI `dbdock schedule` command manages configuration for external schedulers but does not run a daemon itself. Using `node-cron` as shown above is the recommended way to run scheduled backups programmatically.
 
-### Email Alerts
-
-DBDock can send email notifications when backups complete (success or failure). Email alerts work **only with programmatic usage** - they don't send for CLI commands like `npx dbdock backup`.
-
+### Alerts
+ 
+DBDock can send notifications when backups complete (success or failure) via Email and Slack. Alerts work with both **programmatic usage** and **CLI commands**.
+ 
 **Configuration in `dbdock.config.json`:**
-
+ 
 ```json
 {
   "database": { ... },
@@ -559,13 +568,24 @@ DBDock can send email notifications when backups complete (success or failure). 
       },
       "from": "backups@yourapp.com",
       "to": ["admin@yourapp.com", "devops@yourapp.com"]
+    },
+    "slack": {
+      "enabled": true,
+      "webhookUrl": "https://hooks.slack.com/services/..."
     }
   }
 }
 ```
-
+ 
+**Slack Configuration:**
+ 
+1. Create a Slack App or use an existing one.
+2. Enable "Incoming Webhooks".
+3. Create a new Webhook URL for your channel.
+4. Run `npx dbdock init` and paste the URL when prompted.
+ 
 **SMTP Provider Examples:**
-
+ 
 _Gmail:_
 ```json
 {
@@ -580,9 +600,9 @@ _Gmail:_
   }
 }
 ```
-
+ 
 > **Note:** For Gmail, you need to [create an App Password](https://support.google.com/accounts/answer/185833) instead of using your regular password.
-
+ 
 _SendGrid:_
 ```json
 {
@@ -597,7 +617,7 @@ _SendGrid:_
   }
 }
 ```
-
+ 
 _AWS SES:_
 ```json
 {
@@ -612,7 +632,7 @@ _AWS SES:_
   }
 }
 ```
-
+ 
 _Mailgun:_
 ```json
 {
@@ -627,61 +647,59 @@ _Mailgun:_
   }
 }
 ```
-
-**Using Email Alerts Programmatically:**
-
-Once configured in `dbdock.config.json`, email alerts are sent automatically when you create backups programmatically:
-
+ 
+**Using Alerts Programmatically:**
+ 
+Once configured in `dbdock.config.json`, alerts are sent automatically when you create backups programmatically:
+ 
 ```javascript
 const { createDBDock, BackupService } = require('dbdock');
-
-async function createBackupWithEmail() {
+ 
+async function createBackupWithAlerts() {
   const dbdock = await createDBDock();
   const backupService = dbdock.get(BackupService);
-
-  // Email will be sent automatically after backup completes
+ 
+  // Alerts will be sent automatically after backup completes
   const result = await backupService.createBackup({
     compress: true,
     encrypt: true,
   });
-
+ 
   console.log(`Backup created: ${result.metadata.id}`);
-  // Email sent to addresses in config
+  // Alerts sent to configured channels
 }
-
-createBackupWithEmail().catch(console.error);
+ 
+createBackupWithAlerts().catch(console.error);
 ```
-
-**Email Content:**
-
-Success emails include:
+ 
+**Alert Content:**
+ 
+Success alerts include:
 - Backup ID
 - Database name
 - Size (original and compressed)
 - Duration
 - Storage location
 - Encryption status
-
-Failure emails include:
+ 
+Failure alerts include:
 - Error message
 - Database details
 - Timestamp
 - Helpful troubleshooting tips
-
-**Testing Email Configuration:**
-
-Run `npx dbdock test` to validate your SMTP settings without creating a backup.
-
+ 
+**Testing Alert Configuration:**
+ 
+Run `npx dbdock test` to validate your configuration without creating a backup.
+ 
 **Important Notes:**
-
-- ✅ Emails work with programmatic usage (`createBackup()`)
-- ✅ Emails work with scheduled backups (cron jobs in your app)
-- ❌ Emails do NOT work with CLI commands (`npx dbdock backup`)
-- Email configuration is read from `dbdock.config.json` automatically
-- Multiple recipients supported in the `to` array
-- Emails are sent asynchronously (won't block backup completion)
-
-
+ 
+- ✅ Alerts work with programmatic usage (`createBackup()`)
+- ✅ Alerts work with scheduled backups (cron jobs in your app)
+- ✅ Alerts work with CLI commands (`npx dbdock backup`)
+- Configuration is read from `dbdock.config.json` automatically
+- Multiple recipients supported in the `to` array for email
+- Alerts are sent asynchronously (won't block backup completion)
 
 ## Requirements
 
